@@ -1,3 +1,5 @@
+# cloudformation template that creates vpc endpoints for s3 gateway, cloudwatch interface, dynamodb interface, ec2 instance connect, ssm session manager based on vpc id and subnet id input parameters
+
 AWSTemplateFormatVersion: 2010-09-09
 Description: Create Gateway VPC Endpoints for S3 and DynamoDB. Interface VPC Endpoints for CloudWatch Monitoring/Logs, EC2 Instance Connect and SSM with a default SG.
 Parameters:
@@ -165,8 +167,33 @@ Resources:
       ServiceName: !Sub "com.amazonaws.${AWS::Region}.ssmmessages"
       VpcEndpointType: Interface
       PrivateDnsEnabled: false
+  VPCEndpointEC2ICSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: VPC Endpoint Security Group for EC2 Instance Connect
+      VpcId: !Ref VpcId
+  VPCEndpointEC2ICSecurityGroupEgress:
+    Type: AWS::EC2::SecurityGroupEgress
+    Properties:
+      GroupId: !Ref VPCEndpointEC2ICSecurityGroup
+      FromPort: 22
+      ToPort: 22
+      IpProtocol: tcp
+      DestinationSecurityGroupId: !Ref VPCEndpointEC2ICSecurityGroup
+  VPCEndpointEC2ICSecurityGroupEgress2:
+    Type: AWS::EC2::SecurityGroupEgress
+    Properties:
+      GroupId: !Ref VPCEndpointEC2ICSecurityGroup
+      FromPort: 22
+      ToPort: 22
+      IpProtocol: tcp
+      CidrIp: !If
+        - HasVpcCIDR
+        - !Ref VpcCIDR
+        - "0.0.0.0/0"
   EC2InstanceConnectEndpoint:
     Type: AWS::EC2::InstanceConnectEndpoint
+    UpdateReplacePolicy: "Delete"
     Properties:
       SubnetId: !Select
         - 0
@@ -175,5 +202,5 @@ Resources:
         - ","
         - !Join
           - ","
-          - - !GetAtt VPCEndpointSecurityGroup.GroupId
+          - - !GetAtt VPCEndpointEC2ICSecurityGroup.GroupId
       PreserveClientIp: false
