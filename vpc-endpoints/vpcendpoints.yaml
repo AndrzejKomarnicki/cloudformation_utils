@@ -1,5 +1,3 @@
-# cloudformation template that creates vpc endpoints for s3 gateway, cloudwatch interface, dynamodb interface, ec2 instance connect, ssm session manager based on vpc id and subnet id input parameters
-
 AWSTemplateFormatVersion: 2010-09-09
 Description: Create Gateway VPC Endpoints for S3 and DynamoDB. Interface VPC Endpoints for CloudWatch Monitoring/Logs, EC2 Instance Connect and SSM with a default SG.
 Parameters:
