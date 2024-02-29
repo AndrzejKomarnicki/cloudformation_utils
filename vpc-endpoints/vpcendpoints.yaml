@@ -1,0 +1,179 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: Create Gateway VPC Endpoints for S3 and DynamoDB. Interface VPC Endpoints for CloudWatch Monitoring/Logs, EC2 Instance Connect and SSM with a default SG.
+Parameters:
+  VpcId:
+    Type: String
+    Description: VPC ID
+  VpcCIDR:
+    Type: String
+    Description: VPC CIDR to associate with VPC Endpoint security group (if not provided 0.0.0.0/0 will be used instead)
+  SubnetIds:
+    Type: List<String>
+    Description: Comma separated list of subnet IDs
+  RouteTableIds:
+    Type: List<String>
+    Description: Comma separated list of route table IDs
+Conditions:
+  HasVpcCIDR: !Not
+    - !Equals
+      - ""
+      - !Ref VpcCIDR
+Resources:
+  VPCEndpointSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: VPC Endpoint Security Group
+      VpcId: !Ref VpcId
+  VPCEndpointSecurityGroupIngress:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      GroupId: !Ref VPCEndpointSecurityGroup
+      FromPort: 443
+      ToPort: 443
+      IpProtocol: tcp
+      SourceSecurityGroupId: !Ref VPCEndpointSecurityGroup
+  VPCEndpointSecurityGroupIngress2:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      GroupId: !Ref VPCEndpointSecurityGroup
+      FromPort: 443
+      ToPort: 443
+      IpProtocol: tcp
+      CidrIp: !If
+        - HasVpcCIDR
+        - !Ref VpcCIDR
+        - "0.0.0.0/0"
+  S3Endpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal: "*"
+            Action:
+              - s3:*
+            Resource:
+              - "*"
+      RouteTableIds: !Ref RouteTableIds
+      ServiceName: !Sub "com.amazonaws.${AWS::Region}.s3"
+      VpcId: !Ref VpcId
+      VpcEndpointType: Gateway
+      PrivateDnsEnabled: false
+  DynamoDbEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal: "*"
+            Action:
+              - dynamodb:*
+            Resource:
+              - "*"
+      RouteTableIds: !Ref RouteTableIds
+      ServiceName: !Sub "com.amazonaws.${AWS::Region}.dynamodb"
+      VpcId: !Ref VpcId
+      VpcEndpointType: Gateway
+      PrivateDnsEnabled: false
+  CloudWatchEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal: "*"
+            Action:
+              - logs:*
+            Resource:
+              - "*"
+      SubnetIds: !Ref SubnetIds
+      SecurityGroupIds: !Split
+        - ","
+        - !Join
+          - ","
+          - - !GetAtt VPCEndpointSecurityGroup.GroupId
+      VpcId: !Ref VpcId
+      ServiceName: !Sub "com.amazonaws.${AWS::Region}.logs"
+      VpcEndpointType: Interface
+      PrivateDnsEnabled: false
+  MonitoringEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal: "*"
+            Action:
+              - cloudwatch:*
+            Resource:
+              - "*"
+      SubnetIds: !Ref SubnetIds
+      SecurityGroupIds: !Split
+        - ","
+        - !Join
+          - ","
+          - - !GetAtt VPCEndpointSecurityGroup.GroupId
+      VpcId: !Ref VpcId
+      ServiceName: !Sub "com.amazonaws.${AWS::Region}.monitoring"
+      VpcEndpointType: Interface
+      PrivateDnsEnabled: false
+  SsmEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal: "*"
+            Action:
+              - ssm:*
+            Resource:
+              - "*"
+      SubnetIds: !Ref SubnetIds
+      SecurityGroupIds: !Split
+        - ","
+        - !Join
+          - ","
+          - - !GetAtt VPCEndpointSecurityGroup.GroupId
+      VpcId: !Ref VpcId
+      ServiceName: !Sub "com.amazonaws.${AWS::Region}.ssm"
+      VpcEndpointType: Interface
+      PrivateDnsEnabled: false
+  SsmMessagesEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal: "*"
+            Action:
+              - ssmmessages:*
+            Resource:
+              - "*"
+      SubnetIds: !Ref SubnetIds
+      SecurityGroupIds: !Split
+        - ","
+        - !Join
+          - ","
+          - - !GetAtt VPCEndpointSecurityGroup.GroupId
+      VpcId: !Ref VpcId
+      ServiceName: !Sub "com.amazonaws.${AWS::Region}.ssmmessages"
+      VpcEndpointType: Interface
+      PrivateDnsEnabled: false
+  EC2InstanceConnectEndpoint:
+    Type: AWS::EC2::InstanceConnectEndpoint
+    Properties:
+      SubnetId: !Select
+        - 0
+        - !Ref SubnetIds
+      SecurityGroupIds: !Split
+        - ","
+        - !Join
+          - ","
+          - - !GetAtt VPCEndpointSecurityGroup.GroupId
+      PreserveClientIp: false
